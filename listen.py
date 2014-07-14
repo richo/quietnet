@@ -99,14 +99,19 @@ def process_bits():
         sys.stdout.write(psk.decode(cur_bits[:-len(sigil)]))
         sys.stdout.flush()
 
-# start the queue processing threads
-processes = [process_frames, process_points, process_bits]
-threads = []
+def main():
+    # start the queue processing threads
+    processes = [process_frames, process_points, process_bits]
+    threads = []
 
-for process in processes:
-    thread = threading.Thread(target=process)
-    thread.daemon = True
-    thread.start()
+    for process in processes:
+        thread = threading.Thread(target=process)
+        thread.daemon = True
+        thread.start()
+
+    sys.stdout.write("Quietnet listening at %sHz" % search_freq)
+    sys.stdout.flush()
+    start_analysing_stream()
 
 def callback(in_data, frame_count, time_info, status):
     frames = list(quietnet.chunks(quietnet.unpack(in_data), chunk))
@@ -123,6 +128,6 @@ def start_analysing_stream():
     while stream.is_active():
         time.sleep(wait_for_sample_timeout)
 
-sys.stdout.write("Quietnet listening at %sHz" % search_freq)
-sys.stdout.flush()
-start_analysing_stream()
+
+if __name__ == '__main__':
+    main()

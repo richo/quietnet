@@ -4,4 +4,5 @@ channels = 1
 frame_length = 3
 chunk = 256
 datasize = chunk * frame_length
+bottom_threshold = 8000
 sigil = "00"

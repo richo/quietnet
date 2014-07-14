@@ -53,7 +53,7 @@ if __name__ == "__main__":
         while True:
             message = user_input("> ")
             try:
-              pattern = psk.encode(message)
+              pattern = psk.encode(message, options.sigil)
               buffer = make_buffer_from_bit_pattern(pattern, FREQ, FREQ_OFF)
               play_buffer(buffer)
             except KeyError:

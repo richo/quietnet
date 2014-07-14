@@ -100,11 +100,11 @@ decode_psk = {}
 for k, v in psk.items():
     decode_psk[v] = k
 
-def encode(string):
+def encode(string, sigil):
     result = []
     for c in string:
         result.append(psk[c])
-    return '00'.join(result) + '00'
+    return sigil.join(result) + sigil
 
 def decode(string):
     try:

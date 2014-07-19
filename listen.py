@@ -99,6 +99,7 @@ def process_bits():
         sys.stdout.write(psk.decode(cur_bits[:-len(sigil)]))
         sys.stdout.flush()
 
+quiet = False
 def main():
     # start the queue processing threads
     processes = [process_frames, process_points, process_bits]
@@ -109,8 +110,9 @@ def main():
         thread.daemon = True
         thread.start()
 
-    sys.stdout.write("Quietnet listening at %sHz" % search_freq)
-    sys.stdout.flush()
+    if not quiet:
+        sys.stdout.write("Quietnet listening at %sHz" % search_freq)
+        sys.stdout.flush()
     start_analysing_stream()
 
 def callback(in_data, frame_count, time_info, status):
@@ -130,4 +132,9 @@ def start_analysing_stream():
 
 
 if __name__ == '__main__':
+    if "-q" in sys.argv:
+        sys.argv.pop(sys.argv.index("-q"))
+        quiet = True
+    if len(sys.argv) > 1:
+        freq = int(sys.argv[1])
     main()

@@ -12,6 +12,8 @@ FREQ_OFF = 0
 FRAME_LENGTH = options.frame_length
 DATASIZE = options.datasize
 
+quiet = False
+
 p = pyaudio.PyAudio()
 stream = p.open(format=FORMAT, channels=CHANNELS, rate=RATE, output=True)
 
@@ -46,12 +48,21 @@ def play_buffer(buffer):
     stream.write(output)
 
 if __name__ == "__main__":
-    print("Welcome to quietnet. Use ctrl-c to exit")
+    input_s = "> "
+    if "-q" in sys.argv:
+        sys.argv.pop(sys.argv.index("-q"))
+        quiet = True
+        input_s = ""
+    if len(sys.argv) > 1:
+        FREQ = int(sys.argv[1])
+
+    if not quiet:
+        print("Welcome to quietnet. Use ctrl-c to exit")
 
     try:
         # get user input and play message
         while True:
-            message = user_input("> ")
+            message = user_input(input_s)
             try:
               pattern = psk.encode(message, options.sigil)
               buffer = make_buffer_from_bit_pattern(pattern, FREQ, FREQ_OFF)

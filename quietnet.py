@@ -1,6 +1,7 @@
 import numpy as np
 import struct
 import math
+import options
 
 # let us use input in python 2.x.
 try: input = raw_input
@@ -56,7 +57,7 @@ def raw_has_freq(buffer, freq_in_hertz, rate, chunk):
     fft_sample = fft(get_signal(buffer))
     return has_freq(fft_sample, freq_in_hertz, rate, chunk)
 
-def get_freq_over_time(ffts, search_freq, chunk=1024, rate=44100):
+def get_freq_over_time(ffts, search_freq, chunk=1024, rate=options.rate):
     return [has_freq(fft, search_freq, rate, chunk) for fft in ffts]
 
 def get_points(freq_samples, frame_length, threshold=None, last_point=0):
@@ -103,14 +104,14 @@ def decode(bytes):
         string += chr(int(byte, base=2))
     return string
 
-def tone(freq=400, datasize=4096, rate=44100, amp=12000.0, offset=0):
+def tone(freq=400, datasize=4096, rate=options.rate, amp=12000.0, offset=0):
     sine_list=[]
     for x in range(datasize):
         samp = math.sin(2*math.pi*freq*((x + offset)/float(rate)))
         sine_list.append(int(samp*amp))
     return sine_list
 
-def envelope(in_data, left=True, right=True, rate=44100):
+def envelope(in_data, left=True, right=True, rate=options.rate):
     half = float(len(in_data)) / 2
     freq = math.pi / (len(in_data) / 2)
     out_data = []

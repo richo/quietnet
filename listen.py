@@ -22,6 +22,7 @@ in_frames = Queue.Queue(in_length)
 # the value of the fft at the frequency we care about
 points = Queue.Queue(in_length)
 bits = Queue.Queue(in_length / frame_length)
+recieved_bytes = Queue.Queue(1024)
 
 wait_for_sample_timeout = 0.1
 wait_for_frames_timeout = 0.1
@@ -64,11 +65,10 @@ def process_points():
                 except Queue.Empty:
                     time.sleep(wait_for_point_timeout)
             if next_point > bottom_threshold:
-                bits.put(0)
-                bits.put(0)
+                for i in range(len(options.sigil)):
+                    bits.put(0)
                 cur_points = [cur_points[-1]]
                 break
-        print("")
 
         last_bits = []
         while True:
@@ -88,19 +88,59 @@ def process_points():
                 time.sleep(wait_for_point_timeout)
 
 def process_bits():
+    _bits = []
     while True:
         cur_bits = []
         # while the last two characters are not the sigil
-        while len(cur_bits) < 2 or cur_bits[-len(sigil):len(cur_bits)] != sigil:
+        while len(cur_bits) < len(sigil) or cur_bits[-len(sigil):len(cur_bits)] != sigil:
             try:
                 cur_bits.append(bits.get(False))
             except Queue.Empty:
                 time.sleep(wait_for_byte_timeout)
-        sys.stdout.write(psk.decode(cur_bits[:-len(sigil)]))
-        sys.stdout.flush()
+        if cur_bits == sigil:
+            continue
+        # Oh god, really?
+        cur_bits = cur_bits[:-len(sigil)]
+        cur_bits = filter(lambda x: x, cur_bits)
+
+        # print "cur -> %s" % repr(cur_bits)
+        open("/dev/null", "w").write(repr(cur_bits))
+        if len(cur_bits) < 2:
+            continue
+        elif len(cur_bits) > 9:
+            if len(cur_bits) > 27:
+                print "WARNING: Probably just doubled a byte :<"
+                if len(cur_bits) > 35:
+                    print "Assuming doubled bits were both 1"
+                    _bits.insert(0, 1)
+                else:
+                    print "Taking a punt on ordering"
+                    _bits.insert(0, 0)
+            _bits.insert(0, 1)
+        else:
+            _bits.insert(0, 0)
+
+        if len(_bits) >= 8:
+            # Got a whole byte! Maybe even more than one!
+            operative_bits, _bits = _bits[-8:], _bits[8:]
+            byte = 0
+            for idx, i in enumerate(operative_bits):
+                byte |= i << idx
+            recieved_bytes.put(chr(byte))
+            # sys.stdout.write(chr(byte))
+            # sys.stdout.flush()
+        # sys.stdout.write(psk.decode(cur_bits[:-len(sigil)]))
 
 quiet = False
 def main():
+    setup_processes()
+    if not quiet:
+        sys.stdout.write("Quietnet listening at %sHz\n" % search_freq)
+        sys.stdout.flush()
+    for char in start_analysing_stream():
+        print char
+
+def setup_processes():
     # start the queue processing threads
     processes = [process_frames, process_points, process_bits]
     threads = []
@@ -110,10 +150,6 @@ def main():
         thread.daemon = True
         thread.start()
 
-    if not quiet:
-        sys.stdout.write("Quietnet listening at %sHz" % search_freq)
-        sys.stdout.flush()
-    start_analysing_stream()
 
 def callback(in_data, frame_count, time_info, status):
     frames = list(quietnet.chunks(quietnet.unpack(in_data), chunk))
@@ -128,7 +164,10 @@ def start_analysing_stream():
         input=True, frames_per_buffer=frames_per_buffer, stream_callback=callback)
     stream.start_stream()
     while stream.is_active():
-        time.sleep(wait_for_sample_timeout)
+        try:
+            yield recieved_bytes.get(False)
+        except Queue.Empty:
+            time.sleep(wait_for_sample_timeout)
 
 
 if __name__ == '__main__':

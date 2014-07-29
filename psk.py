@@ -96,10 +96,10 @@ psk = { # {{{
 '~'   :"1011010111",
 } # }}}
 
-# psk = {
-#         '0': "10101010101",
-#         '1': "1",
-# }
+psk = {
+        0: "11",
+        1: "1111111111111111111111111",
+}
 decode_psk = {}
 for k, v in psk.items():
     decode_psk[v] = k
@@ -112,7 +112,6 @@ def encode(string, sigil):
 
 def decode(string):
     try:
-        print repr(repr(string))
         return decode_psk[''.join([str(i) for i in string])]
     except:
         return ''

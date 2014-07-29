@@ -1,4 +1,5 @@
 import sys
+import time
 import pyaudio
 import quietnet
 import options
@@ -43,9 +44,30 @@ def make_buffer_from_bit_pattern(pattern, on_freq, off_freq):
 
     return quietnet.pack_buffer(output_buffer)
 
+def convert_message_to_bits(msg):
+    for c in map(ord, msg):
+        bits = []
+        for i in range(8, 0, -1):
+            i -= 1
+            bits.append(1 if c & (1 << i) else 0)
+            yield bits[-1]
+        print repr(list(reversed(bits)))
+
 def play_buffer(buffer):
     output = ''.join(buffer)
     stream.write(output)
+
+def send_bytes(message):
+    for idx, bit in enumerate(convert_message_to_bits(message)):
+        # if idx != 0 and idx % 8 * 16 == 0:
+        #     print("Waiting for a moment to allow sigils + resync")
+        #     time.sleep(5)
+        # if idx != 0 and idx % (8 * 8) == 0:
+        #     print("Sent %d bytes" % (idx / 8))
+        pattern = psk.encode([bit], options.sigil)
+        buffer = make_buffer_from_bit_pattern(pattern, FREQ, FREQ_OFF)
+        play_buffer(buffer)
+        time.sleep(0.2)
 
 if __name__ == "__main__":
     input_s = "> "
@@ -64,9 +86,13 @@ if __name__ == "__main__":
         while True:
             message = user_input(input_s)
             try:
-              pattern = psk.encode(message, options.sigil)
-              buffer = make_buffer_from_bit_pattern(pattern, FREQ, FREQ_OFF)
-              play_buffer(buffer)
+              bits = convert_message_to_bits(message)
+              print(repr(bits))
+              for bit in bits:
+                  pattern = psk.encode([bit], options.sigil)
+                  buffer = make_buffer_from_bit_pattern(pattern, FREQ, FREQ_OFF)
+                  play_buffer(buffer)
+                  time.sleep(0.2)
             except KeyError:
               print("Messages may only contain printable ASCII characters.")
     except KeyboardInterrupt:

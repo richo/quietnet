@@ -29,17 +29,44 @@ wait_for_point_timeout = 0.1
 wait_for_byte_timeout = 0.1
 
 # yeeeep this is just hard coded
-bottom_threshold = 8000
+bottom_threshold = 5000
 
-def process_frames():
+DECODE = {
+    0: 1,
+    1: None,
+    2: 0
+}
+
+
+def process_frames(tones):
+    ONE, SIGIL, ZERO = (
+            tones[1],
+            tones[None],
+            tones[0]
+            )
+
+    unpack = lambda p: (
+                quietnet.has_freq(p, ONE, rate, chunk),
+                quietnet.has_freq(p, SIGIL, rate, chunk),
+                quietnet.has_freq(p, ZERO, rate, chunk)
+                )
+
     while True:
         try:
             frame = in_frames.get(False)
             fft = quietnet.fft(frame)
-            point = quietnet.has_freq(fft, search_freq, rate, chunk)
-            points.put(point)
+            points.put(unpack(fft))
         except Queue.Empty:
             time.sleep(wait_for_frames_timeout)
+
+
+def normalise(points):
+    return (
+        np.average(map(lambda p: p[0], points)),
+        np.average(map(lambda p: p[1], points)),
+        np.average(map(lambda p: p[2], points)),
+    )
+
 
 def process_points():
     while True:
@@ -50,45 +77,33 @@ def process_points():
             except Queue.Empty:
                 time.sleep(wait_for_point_timeout)
 
+        ring = 0
         while True:
-            while np.average(cur_points) > bottom_threshold:
+            best = 0
+            while best < bottom_threshold:
+                norm = normalise(cur_points)
+                best = max(norm)
                 try:
+                    ring <<= 1
+                    if ring & 0b1111 == 0:
+                        sent = False
                     cur_points.append(points.get(False))
-                    cur_points = cur_points[1:]
+                    cur_points.pop(0)
                 except Queue.Empty:
                     time.sleep(wait_for_point_timeout)
-            next_point = None
-            while next_point == None:
-                try:
-                    next_point = points.get(False)
-                except Queue.Empty:
-                    time.sleep(wait_for_point_timeout)
-            if next_point > bottom_threshold:
-                for i in range(len(options.sigil)):
-                    bits.put(0)
-                cur_points = [cur_points[-1]]
-                break
+            ring |= 1
+            ring &= 0xff
 
-        last_bits = []
-        while True:
-            if len(cur_points) == frame_length:
-                bit = int(quietnet.get_bit(cur_points, frame_length) > bottom_threshold)
-                cur_points = []
-                bits.put(bit)
-                last_bits.append(bit)
-            # if we've only seen low bits for a while assume the next message might not be on the same bit boundary
-            if len(last_bits) > 3:
-                if sum(last_bits) == 0:
-                    break
-                last_bits = last_bits[1:]
-            try:
-                cur_points.append(points.get(False))
-            except Queue.Empty:
-                time.sleep(wait_for_point_timeout)
+            idx = norm.index(best)
+            if ring & 0b11 == 0b11 and not sent:
+                sent = True
+                bits.put(DECODE[idx])
+                print("Got a %s" % DECODE[idx])
 
 def process_bits():
     _bits = []
     while True:
+        continue
         cur_bits = []
         # while the last two characters are not the sigil
         while len(cur_bits) < len(sigil) or cur_bits[-len(sigil):len(cur_bits)] != sigil:
@@ -102,8 +117,6 @@ def process_bits():
         cur_bits = cur_bits[:-len(sigil)]
         cur_bits = filter(lambda x: x, cur_bits)
 
-        # print "cur -> %s" % repr(cur_bits)
-        open("/dev/null", "w").write(repr(cur_bits))
         if len(cur_bits) < 2:
             continue
         elif len(cur_bits) > 9:
@@ -139,10 +152,10 @@ def main():
     for char in start_analysing_stream():
         print char
 
-def setup_processes():
+def setup_processes(tones):
     # start the queue processing threads
-    processes = [process_frames, process_points, process_bits]
-    threads = []
+    processes = [lambda: process_frames(tones),
+            process_points, process_bits]
 
     for process in processes:
         thread = threading.Thread(target=process)

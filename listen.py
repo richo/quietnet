@@ -98,50 +98,44 @@ def process_points():
             if ring & 0b11 == 0b11 and not sent:
                 sent = True
                 bits.put(DECODE[idx])
-                print("Got a %s" % DECODE[idx])
 
+SIGIL = (None, None)
 def process_bits():
+    sigil = SIGIL
     _bits = []
     while True:
-        continue
         cur_bits = []
         # while the last two characters are not the sigil
-        while len(cur_bits) < len(sigil) or cur_bits[-len(sigil):len(cur_bits)] != sigil:
+        while len(cur_bits) < 10: # Sigil plus a byte
             try:
                 cur_bits.append(bits.get(False))
             except Queue.Empty:
                 time.sleep(wait_for_byte_timeout)
-        if cur_bits == sigil:
-            continue
-        # Oh god, really?
-        cur_bits = cur_bits[:-len(sigil)]
-        cur_bits = filter(lambda x: x, cur_bits)
+            else:
+                if cur_bits[0] is not None:
+                    print("First bit not a sigil, seeking")
+                    cur_bits.pop(0)
+                    continue
+        # Keep going till we see a plausible looking sigil
 
-        if len(cur_bits) < 2:
-            continue
-        elif len(cur_bits) > 9:
-            if len(cur_bits) > 27:
-                print "WARNING: Probably just doubled a byte :<"
-                if len(cur_bits) > 35:
-                    print "Assuming doubled bits were both 1"
-                    _bits.insert(0, 1)
-                else:
-                    print "Taking a punt on ordering"
-                    _bits.insert(0, 0)
-            _bits.insert(0, 1)
-        else:
-            _bits.insert(0, 0)
+        sigil = cur_bits[:2]
+        msg = cur_bits[2:]
 
-        if len(_bits) >= 8:
-            # Got a whole byte! Maybe even more than one!
-            operative_bits, _bits = _bits[-8:], _bits[8:]
-            byte = 0
-            for idx, i in enumerate(operative_bits):
-                byte |= i << idx
-            recieved_bytes.put(chr(byte))
-            # sys.stdout.write(chr(byte))
-            # sys.stdout.flush()
-        # sys.stdout.write(psk.decode(cur_bits[:-len(sigil)]))
+        if sigil != [None, None]:
+            print("Warning, possibly corrupt sigil")
+
+        if len(msg) != 8:
+            print("Warning, probably dropped a bit")
+
+        if None in msg:
+            print("Magic hamming time!")
+            print repr(msg)
+
+        byte = 0
+        for idx, i in enumerate(msg):
+            # lol endianness
+            byte |= i << 7 - idx
+        recieved_bytes.put(chr(byte))
 
 quiet = False
 def main():

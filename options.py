@@ -1,8 +1,9 @@
 rate = 44100
-freq = 19100# chosen because it is outside most people's hearing and worked for my microphone and speakers
+# freq = 19100# chosen because it is outside most people's hearing and worked for my microphone and speakers
+# freq = 440
 channels = 1
 frame_length = 5
 chunk = 256
 datasize = chunk * frame_length
 bottom_threshold = 8000
-sigil = "0000"
+# sigil = "0000"

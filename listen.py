@@ -11,9 +11,8 @@ import psk
 FORMAT = pyaudio.paInt16
 frame_length = options.frame_length
 chunk = options.chunk
-search_freq = options.freq
 rate = options.rate
-sigil = [int(x) for x in options.sigil]
+# sigil = [int(x) for x in options.sigil]
 frames_per_buffer = chunk * 10
 
 in_length = 4000
